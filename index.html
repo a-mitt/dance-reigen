@@ -393,7 +393,29 @@ function praise(txt){
 }
 
 /* ---- 操作 ---- */
-const ensure=()=>initAudio();
+/* タップ音は最初に録音しておき、タップ時は再生するだけにする（iPhoneでの遅れ対策） */
+const TAP={cracker:[],tambourine:[],clap:[]};
+async function prerender(fn,dur){
+  const off=new OfflineAudioContext(2,Math.ceil(ctx.sampleRate*dur),ctx.sampleRate);
+  const save=[ctx,master,rev];ctx=off;
+  master=off.createGain();master.connect(off.destination);
+  rev=off.createGain();rev.gain.value=.25;rev.connect(off.destination);
+  try{fn()}finally{[ctx,master,rev]=save}
+  return off.startRendering();
+}
+async function prerenderAll(){
+  for(let i=0;i<3;i++){ // 毎回少し違う音になるよう3種類ずつ
+    TAP.cracker.push(await prerender(sCracker,.6));
+    TAP.tambourine.push(await prerender(sTamb,.5));
+    TAP.clap.push(await prerender(sClap,.25));
+  }
+}
+function tapSound(kind,live){
+  const list=TAP[kind];
+  if(!list.length){live();return}  // 準備中はその場で合成
+  const src=ctx.createBufferSource();src.buffer=pick(list);src.connect(master);src.start();
+}
+const ensure=()=>{const first=!ctx;initAudio();if(first)prerenderAll()};
 // 最初にどこか触った時点で音の準備をしておく（タップ音の遅れ対策）。スマホは裏に回ると止まるので戻ったら再開
 addEventListener('pointerdown',ensure,{capture:true});
 document.addEventListener('visibilitychange',()=>{if(ctx&&!document.hidden)ctx.resume()});
@@ -417,9 +439,9 @@ stage.addEventListener('pointermove',e=>{if(penOn)movePen(e.clientX,e.clientY)})
 stage.addEventListener('pointerdown',e=>{
   ensure();const x=e.clientX,y=e.clientY;
   if(penOn){movePen(x,y);ring(x,y,`hsl(${hue} 100% 70%)`);return}
-  if(tool==='cracker'){sCracker();crackerFx(x,y)}
-  else if(tool==='tambourine'){sTamb();ring(x,y,'#ffd23f');ring(x+rnd(-20,20),y+rnd(-20,20),'#fff');emo(x,y,'🪘')}
-  else{sClap();emo(x,y,'👏')}
+  if(tool==='cracker'){tapSound('cracker',sCracker);crackerFx(x,y)}
+  else if(tool==='tambourine'){tapSound('tambourine',sTamb);ring(x,y,'#ffd23f');ring(x+rnd(-20,20),y+rnd(-20,20),'#fff');emo(x,y,'🪘')}
+  else{tapSound('clap',sClap);emo(x,y,'👏')}
   $('hint').style.opacity=0;
 });
 setTimeout(()=>$('hint').style.opacity=0,6000);
