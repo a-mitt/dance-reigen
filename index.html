@@ -85,6 +85,7 @@ select{font:inherit;font-size:14px;border-radius:8px;border:0;padding:2px 4px}
 </div>
 <div id="ui2">
   <button id="cmtBtn">💬 コメント</button>
+  <button id="cmtShow" class="sel">👀 コメント表示 ON</button>
   <button id="praiseBtn">💖 褒める！</button>
   <button id="cheerBtn">📣 歓声</button>
   <button id="penBtn">🔦 ペンライト</button>
@@ -393,11 +394,14 @@ setTimeout(()=>$('hint').style.opacity=0,6000);
    API_URL に Google Apps Script のウェブアプリURLを入れると、
    送信→スプレッドシートに溜まる→管理者が「表示」にチェック→全員の画面に流れる。 */
 const API_URL='https://script.google.com/macros/s/AKfycbwfjLQL943h4nkDxk4PiszAP1r3qs2HcFLl6X1N9LDHvfU_FmA4sKkQ39yyiy8wYWrb0A/exec';
-const lanes=[];
+const lanes=[];let showCmt=true;
 function flow(txt,mine){
   const e=document.createElement('div');e.className='cmt'+(mine?' mine':'');e.textContent=txt;
   const n=innerWidth<600?7:9,now=performance.now();
-  let lane=0,best=1e18;for(let i=0;i<n;i++){const f=lanes[i]||0;if(f<best){best=f;lane=i}if(f<now){lane=i;break}}
+  if(!showCmt&&!mine)return;
+  // 空いている段からランダムに選ぶ（全部埋まっていたら一番早く空く段）
+  const free=[...Array(n).keys()].filter(i=>(lanes[i]||0)<now);
+  let lane=free.length?pick(free):[...Array(n).keys()].reduce((a,i)=>(lanes[i]||0)<(lanes[a]||0)?i:a,0);
   const fs=innerWidth<600?22:34,dur=rnd(6,8);
   Object.assign(e.style,{top:(14+lane*(66/n))+'vh',fontSize:fs+'px',animationDuration:dur+'s'});
   stage.appendChild(e);
@@ -406,6 +410,8 @@ function flow(txt,mine){
 }
 function toast(m){const t=$('toast');t.textContent=m;t.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.opacity=0,2500)}
 const placeForm=()=>$('cform').style.bottom=($('ui2').offsetHeight+22)+'px';addEventListener('resize',placeForm);
+$('cmtShow').onclick=()=>{showCmt=!showCmt;$('cmtShow').classList.toggle('sel',showCmt);$('cmtShow').textContent='👀 コメント表示 '+(showCmt?'ON':'OFF');
+  if(!showCmt)document.querySelectorAll('.cmt:not(.mine)').forEach(e=>e.remove())};
 $('cmtBtn').onclick=()=>{placeForm();$('cform').classList.toggle('open');$('cmtBtn').classList.toggle('sel');if($('cform').classList.contains('open')){$('cinput').focus();if(API_URL)toast(pollState)}};
 $('cform').onsubmit=async e=>{
   e.preventDefault();const txt=$('cinput').value.trim();if(!txt)return;
