@@ -4,7 +4,7 @@
 <title>ダンス霊幻</title>
 <style>
 html,body{margin:0;height:100%;overflow:hidden;background:#111;font-family:"Hiragino Maru Gothic ProN","M PLUS Rounded 1c",sans-serif;touch-action:manipulation;user-select:none;-webkit-user-select:none}
-#stage{position:fixed;inset:0;overflow:hidden}
+#stage{position:fixed;inset:0;overflow:hidden;touch-action:none}
 #rays{position:absolute;inset:-50%;opacity:.35;mix-blend-mode:overlay;
   background:repeating-conic-gradient(#fff 0 8deg,transparent 8deg 20deg);animation:spin 8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -12,6 +12,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#111;font-family:"Hira
 .spot{position:absolute;top:-5vh;width:30vmax;height:120vh;margin-left:-15vmax;transform-origin:50% 0;
   clip-path:polygon(46% 0,54% 0,100% 100%,0 100%);filter:blur(6px);opacity:.75}
 /* 太ももから上を表示。下の脚は画面外に出しておき、跳ねても切れ目が見えない */
+#glow{position:absolute;left:50%;bottom:8vh;width:min(70vh,95vw);height:min(70vh,95vw);margin-left:max(-35vh,-47.5vw);border-radius:50%;filter:blur(50px);opacity:.7;z-index:1;pointer-events:none;transition:background .15s}
 #dancer{--h:min(100vh,205vw);position:absolute;left:50%;bottom:calc(var(--h) * -0.19);height:var(--h);aspect-ratio:475/1053;
   margin-left:calc(var(--h) * -0.2255);transform-origin:50% 85%;will-change:transform;z-index:2;pointer-events:none}
 .layer{position:absolute;inset:0}
@@ -29,6 +30,13 @@ html,body{margin:0;height:100%;overflow:hidden;background:#111;font-family:"Hira
 @keyframes ring{from{width:0;height:0;margin:0;opacity:1}to{width:160px;height:160px;margin:-80px;opacity:0}}
 .emo{position:absolute;font-size:44px;pointer-events:none;z-index:5;animation:emo 1s ease-out forwards}
 @keyframes emo{0%{transform:translate(-50%,-50%) scale(.3)}30%{transform:translate(-50%,-80%) scale(1.3)}100%{transform:translate(-50%,-200%) scale(1);opacity:0}}
+.bubble{position:absolute;z-index:6;pointer-events:none;font-weight:900;white-space:nowrap;padding:.35em .8em;border-radius:1.2em;
+  background:#fff;box-shadow:0 4px 0 #0004;transition:transform .45s cubic-bezier(.2,1.4,.4,1),opacity .4s}
+.bubble::after{content:"";position:absolute;width:0;height:0;border:.5em solid transparent}
+.bubble.from-bottom::after{top:-.9em;left:50%;margin-left:-.5em;border-bottom:.6em solid #fff}
+.bubble.from-top::after{bottom:-.9em;left:50%;margin-left:-.5em;border-top:.6em solid #fff}
+.bubble.from-left::after{right:-.9em;top:50%;margin-top:-.5em;border-left:.6em solid #fff}
+.bubble.from-right::after{left:-.9em;top:50%;margin-top:-.5em;border-right:.6em solid #fff}
 .praise{position:absolute;z-index:6;pointer-events:none;font-weight:900;white-space:nowrap;
   -webkit-text-stroke:3px #fff;paint-order:stroke fill;text-shadow:0 0 18px #fff,0 4px 0 #0006;animation:praise 2.2s ease-out forwards}
 @keyframes praise{0%{transform:translate(-50%,-50%) rotate(var(--rot)) scale(0)}15%{transform:translate(-50%,-50%) rotate(var(--rot)) scale(1.25)}
@@ -50,7 +58,7 @@ select{font:inherit;font-size:14px;border-radius:8px;border:0;padding:2px 4px}
 #hint{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);color:#fff;background:#0008;padding:4px 12px;border-radius:999px;font-size:12px;z-index:8;pointer-events:none;transition:opacity 1s}
 </style></head><body>
 <div id="stage"><div id="rays"></div><div id="spots"></div>
-  <div id="dancer"><div class="layer ink" id="ink"></div><div class="layer rainbow" id="rb"></div></div>
+  <div id="glow"></div><div id="dancer"><div class="layer ink" id="ink"></div><div class="layer rainbow" id="rb"></div></div>
   <div id="pens"></div><div class="pen" id="myPen"></div>
 </div>
 <div id="ui">
@@ -110,6 +118,7 @@ function onBeat(b){
       :`conic-gradient(from ${b*23}deg,hsl(${hue} 100% 60%),hsl(${h2} 100% 55%),hsl(${h3} 100% 60%),hsl(${hue} 100% 60%))`;
     rb.style.opacity=0;ink.style.opacity=1;
   }
+  $('glow').style.background=`hsl(${h2} 100% 60%)`;
   for(let i=0;i<(style==='piano'?4:12);i++)dot();
   rain(style==='piano'?6:(b%4===0?40:18));
   spots.forEach((e,i)=>e.style.background=`linear-gradient(hsla(${(hue+i*90)%360} 100% 75% / .95),hsla(${(hue+i*90)%360} 100% 60% / 0))`);
@@ -239,9 +248,22 @@ function sTamb(){
   for(let i=0;i<5;i++){noise(t+i*.012,.3,'bandpass',rnd(7000,10000),.35);osc('square',rnd(4800,6200),t+i*.01,.2,.02,master,{lp:9000})}
   noise(t,.05,'lowpass',300,.5);
 }
-function sClap(){const t=ctx.currentTime;for(let i=0;i<3;i++)noise(t+i*.01,.12,'bandpass',rnd(1200,2000),.8)}
+function sClap(){noise(ctx.currentTime,.09,'bandpass',rnd(1300,1900),.9)}
 function sCheer(){
   const t=ctx.currentTime;
+  for(let i=0;i<18;i++){ // 「わ〜〜！」：ウ→アへ母音を動かす合成声
+    const st=t+rnd(0,.25),dur=rnd(1.6,2.4),f0=Math.random()<.5?rnd(180,280):rnd(300,480);
+    const o=ctx.createOscillator();o.type='sawtooth';
+    o.frequency.setValueAtTime(f0*.85,st);o.frequency.linearRampToValueAtTime(f0*1.15,st+.35);o.frequency.linearRampToValueAtTime(f0*.95,st+dur);
+    const vib=ctx.createOscillator(),vg=ctx.createGain();vib.frequency.value=rnd(5,7);vg.gain.value=f0*.03;vib.connect(vg).connect(o.frequency);
+    const g=ctx.createGain();g.gain.setValueAtTime(0,st);g.gain.linearRampToValueAtTime(.05,st+.12);g.gain.setValueAtTime(.05,st+dur*.6);g.gain.linearRampToValueAtTime(0,st+dur);
+    [[300,800,.9],[700,1250,1],[2500,2600,.35]].forEach(([fa,fb,v])=>{ // フォルマント（ウ→ア）
+      const f=ctx.createBiquadFilter(),fg=ctx.createGain();f.type='bandpass';f.Q.value=6;
+      f.frequency.setValueAtTime(fa*(f0>290?1.15:1),st);f.frequency.linearRampToValueAtTime(fb*(f0>290?1.15:1),st+.18);
+      fg.gain.value=v*4;o.connect(f).connect(fg).connect(g);
+    });
+    g.connect(master);g.connect(rev);o.start(st);vib.start(st);o.stop(st+dur+.05);vib.stop(st+dur+.05);
+  }
   for(let i=0;i<10;i++){ // ざわざわ
     const n=ctx.createBufferSource(),f=ctx.createBiquadFilter(),g=ctx.createGain();
     n.buffer=noiseBuf;n.loop=true;f.type='bandpass';f.Q.value=3;f.frequency.value=rnd(500,2500);
@@ -284,13 +306,32 @@ const PRAISE=['れいげーん！','最高！！','霊幻ー！！','師匠ー�
  '推しが今日も生きてる！','最強！','伝説！','神ーー！','愛してるーー！','こっち見てー！','ウインクしてー！','ファンサしてー！','ソルトスプラッシュ！',
  '霊とか相談所 万歳！','お誕生日おめでとう！','生まれてきてくれてありがとう！','好きーー！','輝いてる！！','オーラがすごい！','リズム感天才！',
  '足長い！！','ネクタイまでかっこいい！','ブラボー！','FOOOOO↑','やばい！！','かわいいーー！','今日も元気で偉い！','スター誕生！','アンコール！'];
-function praise(){
-  const e=document.createElement('div'),sz=rnd(28,64),txt=pick(PRAISE);e.className='praise';e.textContent=txt;
-  const h=rnd(0,360),fs=Math.min(sz,innerWidth*.86/txt.length),half=fs*txt.length/2/innerWidth*100;
-  Object.assign(e.style,{left:rnd(half+3,97-half)+'vw',top:rnd(18,75)+'vh',fontSize:fs+'px',color:`hsl(${h} 100% 50%)`,
-    WebkitTextStroke:'3px #fff'});
-  e.style.setProperty('--rot',rnd(-12,12)+'deg');
-  stage.appendChild(e);setTimeout(()=>e.remove(),2200);
+/* 吹き出しの出る場所（重ならないよう枠ごとに1つ） */
+const SLOTS=[
+  {side:'bottom',x:22,y:80},{side:'bottom',x:50,y:80},{side:'bottom',x:78,y:80},
+  {side:'left',x:3,y:30},{side:'left',x:3,y:46},{side:'left',x:3,y:62},
+  {side:'right',x:97,y:30},{side:'right',x:97,y:46},{side:'right',x:97,y:62},
+  {side:'top',x:30,y:16},{side:'top',x:70,y:16}];
+const busy=new Array(SLOTS.length).fill(0);
+function praise(txt){
+  txt=txt||pick(PRAISE);
+  const now=performance.now(),free=SLOTS.map((_,i)=>i).filter(i=>busy[i]<now);
+  if(!free.length)return;
+  const i=pick(free),sl=SLOTS[i];busy[i]=now+2400;
+  const e=document.createElement('div');e.className='bubble from-'+sl.side;e.textContent=txt;
+  const vw=innerWidth/100,mob=innerWidth<600;
+  const maxW=(sl.side==='left'||sl.side==='right')?(mob?44:32):(mob?40:30);   // 枠の幅（vw）
+  const fs=Math.min(mob?20:30,maxW*vw/(txt.length+1.6));
+  Object.assign(e.style,{fontSize:fs+'px',color:`hsl(${rnd(0,360)} 90% 45%)`,top:sl.y+'vh'});
+  let hide;
+  if(sl.side==='left'){e.style.left=sl.x+'vw';e.style.transform='translate(-130vw,-50%)';hide='translate(-130vw,-50%)'}
+  else if(sl.side==='right'){e.style.right=(100-sl.x)+'vw';e.style.transform='translate(130vw,-50%)';hide='translate(130vw,-50%)'}
+  else{e.style.left=sl.x+'vw';const off=sl.side==='bottom'?'60vh':'-60vh';e.style.transform=`translate(-50%,${off})`;hide=`translate(-50%,${off})`}
+  stage.appendChild(e);
+  const show=(sl.side==='left'||sl.side==='right')?'translate(0,-50%)':'translate(-50%,-50%)';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>e.style.transform=show));
+  setTimeout(()=>{e.style.transform=hide.replace('130vw','0').replace('60vh','8vh')+' scale(.6)';e.style.opacity=0},1900);
+  setTimeout(()=>e.remove(),2400);
   if(ctx){const t=ctx.currentTime;[0,4,7,12].forEach((m,i)=>osc('sine',mtof(84+m),t+i*.04,.25,.05).connect(rev))}
 }
 
@@ -305,7 +346,7 @@ document.querySelectorAll('.tool').forEach(bt=>bt.onclick=()=>{
   tool=bt.dataset.tool;document.querySelectorAll('.tool').forEach(x=>x.classList.toggle('sel',x===bt));
 });
 $('praiseBtn').onclick=()=>{ensure();praise()};
-$('cheerBtn').onclick=()=>{ensure();sCheer();for(let i=0;i<3;i++)setTimeout(praise,i*350);rain(60)};
+$('cheerBtn').onclick=()=>{ensure();sCheer();praise(pick(['わ〜〜！！','わーーー！！','キャーーー！！','うおおお！！']));setTimeout(praise,400);setTimeout(praise,800);rain(60)};
 $('penBtn').onclick=()=>{penOn=!penOn;document.body.classList.toggle('on',penOn);$('penBtn').classList.toggle('sel',penOn);
   if(penOn){pens.forEach((e,i)=>glowPen(e,(hue+i*25)%360));glowPen($('myPen'),hue)}};
 let lastX=null;
