@@ -394,7 +394,7 @@ setTimeout(()=>$('hint').style.opacity=0,6000);
    API_URL に Google Apps Script のウェブアプリURLを入れると、
    送信→スプレッドシートに溜まる→管理者が「表示」にチェック→全員の画面に流れる。 */
 const API_URL='https://script.google.com/macros/s/AKfycbwfjLQL943h4nkDxk4PiszAP1r3qs2HcFLl6X1N9LDHvfU_FmA4sKkQ39yyiy8wYWrb0A/exec';
-const lanes=[];let showCmt=true;
+const lanes=[];let showCmt=true;const onScreen=new Map();
 function flow(txt,mine){
   const e=document.createElement('div');e.className='cmt'+(mine?' mine':'');e.textContent=txt;
   const n=innerWidth<600?7:9,now=performance.now();
@@ -404,9 +404,9 @@ function flow(txt,mine){
   let lane=free.length?pick(free):[...Array(n).keys()].reduce((a,i)=>(lanes[i]||0)<(lanes[a]||0)?i:a,0);
   const fs=innerWidth<600?22:34,dur=rnd(6,8);
   Object.assign(e.style,{top:(14+lane*(66/n))+'vh',fontSize:fs+'px',animationDuration:dur+'s'});
-  stage.appendChild(e);
+  stage.appendChild(e);onScreen.set(txt,(onScreen.get(txt)||0)+1);
   lanes[lane]=now+dur*1000*(e.offsetWidth+innerWidth*.15)/(innerWidth+e.offsetWidth); // 後ろが入りきるまで同じ段は空けない
-  setTimeout(()=>e.remove(),dur*1000+100);
+  setTimeout(()=>{e.remove();const c=onScreen.get(txt)-1;c>0?onScreen.set(txt,c):onScreen.delete(txt)},dur*1000+100);
 }
 function toast(m){const t=$('toast');t.textContent=m;t.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.opacity=0,2500)}
 const placeForm=()=>$('cform').style.bottom=($('ui2').offsetHeight+22)+'px';addEventListener('resize',placeForm);
@@ -424,11 +424,19 @@ let approved=[],seen=new Set(),fresh=[],pollState='確認中…';
 async function poll(){
   if(!API_URL)return;
   try{const r=await fetch(API_URL+'?t='+Date.now());const j=await r.json();
-    approved=j.comments||[];approved.forEach(c=>{if(!seen.has(c)){seen.add(c);fresh.push(c)}});
+    approved=[...new Set(j.comments||[])];approved.forEach(c=>{if(!seen.has(c)){seen.add(c);fresh.push(c)}});
     pollState=`サーバー接続OK：承認済み ${approved.length} 件`;
   }catch(err){pollState='サーバーに接続できません（'+err.message+'）'}
 }
 if(API_URL){poll();setInterval(poll,15000);
-  setInterval(()=>{if(fresh.length)flow(fresh.shift());else if(approved.length)flow(pick(approved))},1800)}
+  // 全部を1回ずつシャッフルして順番に流す。今画面に出ている言葉は流さない
+  let deck=[];
+  setInterval(()=>{
+    if(fresh.length){const c=fresh.shift();if(!onScreen.has(c))flow(c);return}
+    for(let tries=0;tries<2;tries++){
+      if(!deck.length)deck=approved.slice().sort(()=>Math.random()-.5);
+      while(deck.length){const c=deck.pop();if(approved.includes(c)&&!onScreen.has(c)){flow(c);return}}
+    }
+  },1800)}
 
 </script></body></html>
