@@ -203,7 +203,8 @@ requestAnimationFrame(tick);
 let master,pad,rev,noiseBuf,next16=0,step=0,timer=null;
 const mtof=m=>440*Math.pow(2,(m-69)/12);
 function initAudio(){
-  if(ctx)return;ctx=new AudioContext();
+  if(ctx){if(ctx.state!=='running')ctx.resume();return}
+  ctx=new AudioContext({latencyHint:'interactive'});
   const comp=ctx.createDynamicsCompressor();comp.threshold.value=-10;comp.ratio.value=6;
   master=ctx.createGain();master.gain.value=.8;master.connect(comp).connect(ctx.destination);
   pad=ctx.createGain();pad.connect(master);                 // EDMのポンプ用
@@ -393,6 +394,9 @@ function praise(txt){
 
 /* ---- 操作 ---- */
 const ensure=()=>initAudio();
+// 最初にどこか触った時点で音の準備をしておく（タップ音の遅れ対策）。スマホは裏に回ると止まるので戻ったら再開
+addEventListener('pointerdown',ensure,{capture:true});
+document.addEventListener('visibilitychange',()=>{if(ctx&&!document.hidden)ctx.resume()});
 $('start').onclick=()=>{
   ensure();playing=!playing;
   if(playing){next16=ctx.currentTime+.1;step=0;lastBeat=-1;$('start').textContent='■ BGM'}
