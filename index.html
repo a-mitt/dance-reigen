@@ -94,7 +94,7 @@ select{font:inherit;font-size:14px;border-radius:8px;border:0;padding:2px 4px}
   <button id="cmtShow" class="sel">👀 コメント表示 ON</button>
   <button id="praiseBtn">💖 褒める！</button>
   <button id="cheerBtn">📣 歓声</button>
-  <button id="penBtn">🔦 ペンライト</button>
+  <button id="penBtn" class="tool" data-tool="pen">🔦 ペンライト</button>
   <button class="tool sel" data-tool="cracker">🎉 クラッカー</button>
   <button class="tool" data-tool="tambourine">🪘 タンバリン</button>
   <button class="tool" data-tool="clap">👏 拍手</button>
@@ -387,13 +387,14 @@ $('start').onclick=()=>{
   if(playing){next16=ctx.currentTime+.1;step=0;lastBeat=-1;$('start').textContent='■ BGM'}
   else $('start').textContent='▶ BGM';
 };
+// ペンライト／クラッカー／タンバリン／拍手 はどれか1つだけ選べる（タップの使い道が重なるため）
 document.querySelectorAll('.tool').forEach(bt=>bt.onclick=()=>{
   tool=bt.dataset.tool;document.querySelectorAll('.tool').forEach(x=>x.classList.toggle('sel',x===bt));
+  penOn=tool==='pen';document.body.classList.toggle('on',penOn);
+  if(penOn){pens.forEach((e,i)=>glowPen(e,(hue+i*25)%360));glowPen($('myPen'),hue)}
 });
 $('praiseBtn').onclick=()=>{ensure();praise()};
 $('cheerBtn').onclick=()=>{ensure();sCheer();praise(pick(['わ〜〜！！','わーーー！！','キャーーー！！','うおおお！！']));setTimeout(praise,400);setTimeout(praise,800);rain(LV?60:25)};
-$('penBtn').onclick=()=>{penOn=!penOn;document.body.classList.toggle('on',penOn);$('penBtn').classList.toggle('sel',penOn);
-  if(penOn){pens.forEach((e,i)=>glowPen(e,(hue+i*25)%360));glowPen($('myPen'),hue)}};
 let lastX=null;
 function movePen(x,y){const p=$('myPen');p.style.left=x+'px';p.style.top=(y-150)+'px';
   const v=lastX==null?0:x-lastX;lastX=x;p.style.transform=`rotate(${Math.max(-45,Math.min(45,v*2))}deg)`}
