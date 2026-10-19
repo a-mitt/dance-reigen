@@ -33,10 +33,20 @@ html,body{margin:0;height:100%;overflow:hidden;background:#111;font-family:"Hira
 .bubble{position:absolute;z-index:6;pointer-events:none;font-weight:900;white-space:nowrap;padding:.35em .8em;border-radius:1.2em;
   background:#fff;box-shadow:0 4px 0 #0004;transition:transform .45s cubic-bezier(.2,1.4,.4,1),opacity .4s}
 .bubble::after{content:"";position:absolute;width:0;height:0;border:.5em solid transparent}
-.bubble.from-bottom::after{top:-.9em;left:50%;margin-left:-.5em;border-bottom:.6em solid #fff}
-.bubble.from-top::after{bottom:-.9em;left:50%;margin-left:-.5em;border-top:.6em solid #fff}
-.bubble.from-left::after{right:-.9em;top:50%;margin-top:-.5em;border-left:.6em solid #fff}
-.bubble.from-right::after{left:-.9em;top:50%;margin-top:-.5em;border-right:.6em solid #fff}
+.bubble.from-top::after{top:-.9em;left:50%;margin-left:-.5em;border-bottom:.6em solid #fff}
+.bubble.from-bottom::after{bottom:-.9em;left:50%;margin-left:-.5em;border-top:.6em solid #fff}
+.bubble.from-right::after{right:-.9em;top:50%;margin-top:-.5em;border-left:.6em solid #fff}
+.bubble.from-left::after{left:-.9em;top:50%;margin-top:-.5em;border-right:.6em solid #fff}
+/* ニコニコ風コメント */
+.cmt{position:absolute;left:100vw;z-index:8;pointer-events:none;white-space:nowrap;font-weight:900;color:#fff;
+  -webkit-text-stroke:4px #000;paint-order:stroke fill;text-shadow:0 2px 6px #0008;animation:flow linear forwards}
+.cmt.mine{color:#ffe14d}
+@keyframes flow{to{transform:translateX(calc(-100vw - 100%))}}
+#cform{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);z-index:10;display:none;gap:6px;width:min(560px,94vw)}
+#cform.open{display:flex}
+#cinput{flex:1;font:inherit;font-size:16px;padding:10px 14px;border-radius:999px;border:0}
+#csend{font:inherit;font-weight:bold;border:0;border-radius:999px;padding:10px 16px;background:#ff5fa2;color:#fff;cursor:pointer}
+#toast{position:fixed;left:50%;top:110px;transform:translateX(-50%);z-index:10;background:#000c;color:#fff;padding:8px 16px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .4s;pointer-events:none}
 .praise{position:absolute;z-index:6;pointer-events:none;font-weight:900;white-space:nowrap;
   -webkit-text-stroke:3px #fff;paint-order:stroke fill;text-shadow:0 0 18px #fff,0 4px 0 #0006;animation:praise 2.2s ease-out forwards}
 @keyframes praise{0%{transform:translate(-50%,-50%) rotate(var(--rot)) scale(0)}15%{transform:translate(-50%,-50%) rotate(var(--rot)) scale(1.25)}
@@ -71,6 +81,7 @@ select{font:inherit;font-size:14px;border-radius:8px;border:0;padding:2px 4px}
   <label>BPM <input id="bpmIn" type="range" min="60" max="180" value="128" style="width:80px"> <span id="bpmV">128</span></label>
 </div>
 <div id="ui2">
+  <button id="cmtBtn">💬 コメント</button>
   <button id="praiseBtn">💖 褒める！</button>
   <button id="cheerBtn">📣 歓声</button>
   <button id="penBtn">🔦 ペンライト</button>
@@ -78,6 +89,8 @@ select{font:inherit;font-size:14px;border-radius:8px;border:0;padding:2px 4px}
   <button class="tool" data-tool="tambourine">🪘 タンバリン</button>
   <button class="tool" data-tool="clap">👏 拍手</button>
 </div>
+<form id="cform"><input id="cinput" maxlength="40" placeholder="霊幻への歓声・褒め言葉（40文字まで）" autocomplete="off"><button id="csend">送信</button></form>
+<div id="toast"></div>
 <div id="hint">画面タップで鳴らせるよ！</div>
 <script>
 const $=id=>document.getElementById(id);
@@ -362,4 +375,40 @@ stage.addEventListener('pointerdown',e=>{
   $('hint').style.opacity=0;
 });
 setTimeout(()=>$('hint').style.opacity=0,6000);
+
+/* ---- みんなのコメント（ニコニコ風） ----
+   API_URL に Google Apps Script のウェブアプリURLを入れると、
+   送信→スプレッドシートに溜まる→管理者が「表示」にチェック→全員の画面に流れる。 */
+const API_URL='';
+const lanes=[];
+function flow(txt,mine){
+  const e=document.createElement('div');e.className='cmt'+(mine?' mine':'');e.textContent=txt;
+  const n=innerWidth<600?7:9,now=performance.now();
+  let lane=0,best=1e18;for(let i=0;i<n;i++){const f=lanes[i]||0;if(f<best){best=f;lane=i}if(f<now){lane=i;break}}
+  const fs=innerWidth<600?22:34,dur=rnd(6,8);
+  Object.assign(e.style,{top:(14+lane*(66/n))+'vh',fontSize:fs+'px',animationDuration:dur+'s'});
+  stage.appendChild(e);
+  lanes[lane]=now+dur*1000*(e.offsetWidth+innerWidth*.15)/(innerWidth+e.offsetWidth); // 後ろが入りきるまで同じ段は空けない
+  setTimeout(()=>e.remove(),dur*1000+100);
+}
+function toast(m){const t=$('toast');t.textContent=m;t.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.opacity=0,2500)}
+const placeForm=()=>$('cform').style.bottom=($('ui2').offsetHeight+22)+'px';addEventListener('resize',placeForm);
+$('cmtBtn').onclick=()=>{placeForm();$('cform').classList.toggle('open');$('cmtBtn').classList.toggle('sel');if($('cform').classList.contains('open'))$('cinput').focus()};
+$('cform').onsubmit=async e=>{
+  e.preventDefault();const txt=$('cinput').value.trim();if(!txt)return;
+  $('cinput').value='';flow(txt,true);  // 自分の画面にはすぐ流す（黄色）
+  if(!API_URL){toast('（サーバー未設定：自分の画面だけに流れます）');return}
+  try{await fetch(API_URL,{method:'POST',body:JSON.stringify({text:txt})});toast('送信しました！承認されるとみんなの画面に流れます')}
+  catch(_){toast('送信に失敗しました…')}
+};
+let approved=[],seen=new Set(),fresh=[];
+async function poll(){
+  if(!API_URL)return;
+  try{const r=await fetch(API_URL+'?t='+Date.now());const j=await r.json();
+    approved=j.comments||[];approved.forEach(c=>{if(!seen.has(c)){seen.add(c);fresh.push(c)}});
+  }catch(_){}
+}
+if(API_URL){poll();setInterval(poll,15000);
+  setInterval(()=>{if(fresh.length)flow(fresh.shift());else if(approved.length)flow(pick(approved))},1800)}
+
 </script></body></html>
