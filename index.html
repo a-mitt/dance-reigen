@@ -68,6 +68,11 @@ body[data-lv="0"] #spots{opacity:.7}
 #ui{top:10px}#ui2{bottom:12px}
 #ui>*,#ui2>*{font:inherit;font-size:14px;border:0;border-radius:999px;padding:9px 14px;background:#000b;color:#fff;display:flex;align-items:center;gap:6px}
 #ui2 button{cursor:pointer;font-weight:bold;font-size:15px}
+#ui2 #tools{padding:4px;gap:4px;background:#000c;border:2px solid #fff6}
+#tools span{padding:0 4px 0 8px;font-size:12px;opacity:.8}
+#tools span,#tools button{white-space:nowrap}
+@media(max-width:480px){#ui2 #tools{flex-wrap:wrap;justify-content:center;border-radius:18px;max-width:300px}#tools span{width:100%;text-align:center;padding:0}#tools button{padding:6px 10px;font-size:13px}}
+#tools button{border:0;border-radius:999px;padding:7px 11px;background:transparent;color:#fff;font:inherit;font-size:14px;font-weight:bold}
 #ui2 button.sel{background:#fff;color:#000}
 #start,#praiseBtn{background:#fff!important;color:#000!important;font-weight:bold;cursor:pointer}
 #praiseBtn{background:linear-gradient(90deg,#ff5fa2,#ffd23f)!important}
@@ -94,10 +99,12 @@ select{font:inherit;font-size:14px;border-radius:8px;border:0;padding:2px 4px}
   <button id="cmtShow" class="sel">👀 コメント表示 ON</button>
   <button id="praiseBtn">💖 褒める！</button>
   <button id="cheerBtn">📣 歓声</button>
-  <button id="penBtn" class="tool" data-tool="pen">🔦 ペンライト</button>
-  <button class="tool sel" data-tool="cracker">🎉 クラッカー</button>
-  <button class="tool" data-tool="tambourine">🪘 タンバリン</button>
-  <button class="tool" data-tool="clap">👏 拍手</button>
+  <div id="tools"><span>タップ：</span>
+    <button id="penBtn" class="tool" data-tool="pen">🔦 ペンライト</button>
+    <button class="tool sel" data-tool="cracker">🎉 クラッカー</button>
+    <button class="tool" data-tool="tambourine">🪘 タンバリン</button>
+    <button class="tool" data-tool="clap">👏 拍手</button>
+  </div>
 </div>
 <form id="cform"><input id="cinput" maxlength="40" placeholder="霊幻への歓声・褒め言葉（40文字まで）" autocomplete="off"><button id="csend">送信</button></form>
 <div id="toast"></div>
@@ -359,15 +366,19 @@ const SLOTS=[
   {side:'top',x:30,y:16},{side:'top',x:70,y:16}];
 const busy=new Array(SLOTS.length).fill(0);
 function praise(txt){
-  txt=txt||pick(PRAISE);
-  const now=performance.now(),free=SLOTS.map((_,i)=>i).filter(i=>busy[i]<now);
+  const shown=new Set([...document.querySelectorAll('.bubble')].map(b=>b.textContent));
+  txt=txt||pick(PRAISE.filter(w=>!shown.has(w)));
+  const now=performance.now(),narrow=innerWidth<600,free=SLOTS.map((_,i)=>i).filter(i=>busy[i]<now&&!(narrow&&SLOTS[i].x===50));
   if(!free.length)return;
   const i=pick(free),sl=SLOTS[i];busy[i]=now+2400;
   const e=document.createElement('div');e.className='bubble from-'+sl.side;e.textContent=txt;
   const vw=innerWidth/100,mob=innerWidth<600;
-  const maxW=(sl.side==='left'||sl.side==='right')?(mob?44:32):(mob?40:30);   // 枠の幅（vw）
+  const maxW=(sl.side==='left'||sl.side==='right')?(mob?44:32):(mob?44:30);   // 枠の幅（vw）
   const fs=Math.min(mob?20:30,maxW*vw/(txt.length+1.6));
-  Object.assign(e.style,{fontSize:fs+'px',color:`hsl(${rnd(0,360)} 90% 45%)`,top:sl.y+'vh'});
+  // 上下の吹き出しはボタンの帯にかぶらない位置に
+  const topY=sl.side==='bottom'?(innerHeight-$('ui2').offsetHeight-fs*1.6-14)+'px'
+            :sl.side==='top'?($('ui').offsetTop+$('ui').offsetHeight+fs*1.2+10)+'px':sl.y+'vh';
+  Object.assign(e.style,{fontSize:fs+'px',color:`hsl(${rnd(0,360)} 90% 45%)`,top:topY});
   let hide;
   if(sl.side==='left'){e.style.left=sl.x+'vw';e.style.transform='translate(-130vw,-50%)';hide='translate(-130vw,-50%)'}
   else if(sl.side==='right'){e.style.right=(100-sl.x)+'vw';e.style.transform='translate(130vw,-50%)';hide='translate(130vw,-50%)'}
