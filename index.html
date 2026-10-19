@@ -48,6 +48,11 @@ body[data-lv="0"] #spots{opacity:.7}
 #cform.open{display:flex}
 #cinput{flex:1;font:inherit;font-size:16px;padding:10px 14px;border-radius:999px;border:0}
 #csend{font:inherit;font-weight:bold;border:0;border-radius:999px;padding:10px 16px;background:#ff5fa2;color:#fff;cursor:pointer}
+.modal{position:fixed;inset:0;z-index:20;background:#0009;display:none;align-items:center;justify-content:center;padding:16px}
+.modal.open{display:flex}
+.modal>div{background:#fff;color:#222;border-radius:18px;padding:20px 22px;max-width:420px;width:100%;line-height:1.7;font-size:15px;max-height:85vh;overflow:auto}
+.modal h2{margin:0 0 8px;font-size:18px}.modal ul{margin:0;padding-left:1.2em}
+.modal button{margin-top:14px;width:100%;font:inherit;font-weight:bold;border:0;border-radius:999px;padding:10px;background:#ff5fa2;color:#fff;cursor:pointer}
 #toast{position:fixed;left:50%;top:110px;transform:translateX(-50%);z-index:10;background:#000c;color:#fff;padding:8px 16px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .4s;pointer-events:none}
 .praise{position:absolute;z-index:6;pointer-events:none;font-weight:900;white-space:nowrap;
   -webkit-text-stroke:3px #fff;paint-order:stroke fill;text-shadow:0 0 18px #fff,0 4px 0 #0006;animation:praise 2.2s ease-out forwards}
@@ -85,6 +90,7 @@ select{font:inherit;font-size:14px;border-radius:8px;border:0;padding:2px 4px}
 </div>
 <div id="ui2">
   <button id="cmtBtn">💬 コメント</button>
+  <button id="cmtHelp">❓</button>
   <button id="cmtShow" class="sel">👀 コメント表示 ON</button>
   <button id="praiseBtn">💖 褒める！</button>
   <button id="cheerBtn">📣 歓声</button>
@@ -95,6 +101,18 @@ select{font:inherit;font-size:14px;border-radius:8px;border:0;padding:2px 4px}
 </div>
 <form id="cform"><input id="cinput" maxlength="40" placeholder="霊幻への歓声・褒め言葉（40文字まで）" autocomplete="off"><button id="csend">送信</button></form>
 <div id="toast"></div>
+<div class="modal" id="help"><div>
+  <h2>💬 コメントについて</h2>
+  <ul>
+    <li>「💬 コメント」から、霊幻への歓声や褒め言葉を送れます（40文字まで）。</li>
+    <li>送ったコメントは、まず自分の画面にだけ流れます。</li>
+    <li>管理者が確認して OK したコメントは、見ている全員の画面に流れます。反映まで少し時間がかかります。</li>
+    <li>同じ言葉が同時に流れることはありません。</li>
+    <li>「👀 コメント表示」で、ほかの人のコメントを自分の画面で表示しない設定にできます。</li>
+    <li>悪口や個人情報は書かないでね。</li>
+  </ul>
+  <button id="helpClose">わかった！</button>
+</div></div>
 <div id="hint">画面タップで鳴らせるよ！</div>
 <script>
 const $=id=>document.getElementById(id);
@@ -410,6 +428,9 @@ function flow(txt,mine){
 }
 function toast(m){const t=$('toast');t.textContent=m;t.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.opacity=0,2500)}
 const placeForm=()=>$('cform').style.bottom=($('ui2').offsetHeight+22)+'px';addEventListener('resize',placeForm);
+$('cmtHelp').onclick=()=>$('help').classList.add('open');
+$('helpClose').onclick=()=>$('help').classList.remove('open');
+$('help').onclick=e=>{if(e.target.id==='help')$('help').classList.remove('open')};
 $('cmtShow').onclick=()=>{showCmt=!showCmt;$('cmtShow').classList.toggle('sel',showCmt);$('cmtShow').textContent='👀 コメント表示 '+(showCmt?'ON':'OFF');
   if(!showCmt)document.querySelectorAll('.cmt:not(.mine)').forEach(e=>e.remove())};
 $('cmtBtn').onclick=()=>{placeForm();$('cform').classList.toggle('open');$('cmtBtn').classList.toggle('sel');if($('cform').classList.contains('open')){$('cinput').focus();if(API_URL)toast(pollState)}};
