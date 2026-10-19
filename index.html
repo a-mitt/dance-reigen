@@ -379,7 +379,7 @@ setTimeout(()=>$('hint').style.opacity=0,6000);
 /* ---- みんなのコメント（ニコニコ風） ----
    API_URL に Google Apps Script のウェブアプリURLを入れると、
    送信→スプレッドシートに溜まる→管理者が「表示」にチェック→全員の画面に流れる。 */
-const API_URL='';
+const API_URL='https://script.google.com/macros/s/AKfycbwfjLQL943h4nkDxk4PiszAP1r3qs2HcFLl6X1N9LDHvfU_FmA4sKkQ39yyiy8wYWrb0A/exec';
 const lanes=[];
 function flow(txt,mine){
   const e=document.createElement('div');e.className='cmt'+(mine?' mine':'');e.textContent=txt;
