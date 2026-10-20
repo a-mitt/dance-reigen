@@ -279,7 +279,12 @@ function initAudio(){
 let playing=false;
 function schedule(){if(!playing)return;
   const s16=60/bpm/4;
-  while(next16<ctx.currentTime+LOOK){STYLES[style].play(step,next16,s16);next16+=s16;step++}
+  // 画面が隠れて処理が止まっていた間の音は鳴らさず飛ばす（まとめて鳴ると「カタタタタ」になる）。
+  // 飛ばすときも step は進めるので、曲の拍の位置はずれない。
+  const behind=ctx.currentTime-next16;
+  if(behind>.05){const skip=Math.ceil((behind+.02)/s16);next16+=skip*s16;step+=skip}
+  let n=0;
+  while(next16<ctx.currentTime+LOOK&&n++<64){STYLES[style].play(step,next16,s16);next16+=s16;step++}
 }
 function env(g,t,a,peak,d){g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+d)}
 function osc(type,f,t,d,vol,dest,{a=.005,detune=0,lp=0}={}){
