@@ -183,18 +183,24 @@ function onBeat(b){
 function glowPen(e,h){e.style.background=`hsl(${h} 100% 70%)`;e.style.boxShadow=LV?`0 0 14px 5px hsl(${h} 100% 60%)`:'none'}
 /* 紙吹雪などは1枚のcanvasにまとめて描く（DOMを大量に作らないので軽い） */
 const fx=$('fx'),g2=fx.getContext('2d');let P=[],DPR=1;
-function fitFx(){DPR=Math.min(devicePixelRatio||1,innerWidth>900?1:1.5);fx.width=innerWidth*DPR;fx.height=innerHeight*DPR}
+let FW=innerWidth,FH=innerHeight;
+function fitFx(){DPR=Math.min(devicePixelRatio||1,innerWidth>900?1:1.5);
+  FW=fx.clientWidth||innerWidth;FH=fx.clientHeight||innerHeight;   // 実際に表示されている大きさに合わせる（iPhoneのツールバー出し入れ対策）
+  fx.width=Math.round(FW*DPR);fx.height=Math.round(FH*DPR)}
 fitFx();addEventListener('resize',fitFx);
+if(window.ResizeObserver)new ResizeObserver(fitFx).observe(fx);
+setInterval(()=>{if((fx.clientWidth||innerWidth)!==FW||(fx.clientHeight||innerHeight)!==FH)fitFx()},1000);
 let MAXP=500;
 function add(p){if(P.length<MAXP)P.push(p)}
-function dot(){add({k:'dot',x:rnd(0,innerWidth),y:rnd(0,innerHeight),r:rnd(5,20),c:`hsl(${rnd(0,360)|0} 100% 60%)`,life:0,max:.9})}
-function rain(n){for(let i=0;i<n;i++){const w=rnd(6,16);add({k:'conf',x:rnd(0,innerWidth),y:-rnd(10,80),vx:rnd(-40,40),vy:rnd(120,260),
+function dot(){add({k:'dot',x:rnd(0,FW),y:rnd(0,FH),r:rnd(5,20),c:`hsl(${rnd(0,360)|0} 100% 60%)`,life:0,max:.9})}
+function rain(n){for(let i=0;i<n;i++){const w=rnd(6,16);add({k:'conf',x:rnd(0,FW),y:-rnd(10,80),vx:rnd(-40,40),vy:rnd(120,260),
   w,h:w*(Math.random()<.5?1.8:.6),rot:rnd(0,6),vr:rnd(-6,6),fl:rnd(0,6),vf:rnd(6,14),c:`hsl(${rnd(0,360)|0} 100% 60%)`,life:0,max:8})}}
 let lastF=performance.now();
 function drawFx(now){
   const dt=Math.min(.05,(now-lastF)/1000);lastF=now;
-  g2.setTransform(DPR,0,0,DPR,0,0);g2.clearRect(0,0,innerWidth,innerHeight);
-  const H=innerHeight;
+  g2.setTransform(1,0,0,1,0,0);g2.clearRect(0,0,fx.width,fx.height);   // 確実に全面を消す
+  g2.setTransform(DPR,0,0,DPR,0,0);
+  const H=FH;
   P=P.filter(p=>{p.life+=dt;if(p.life>p.max)return false;
     if(p.k==='dot'){const q=p.life/p.max;g2.globalAlpha=1-q;g2.fillStyle=p.c;g2.beginPath();g2.arc(p.x,p.y-q*40,p.r*(.2+q*1.2),0,7);g2.fill();return true}
     p.vy+=p.k==='burst'?500*dt:0;p.x+=p.vx*dt;p.y+=p.vy*dt;p.rot+=p.vr*dt;p.fl+=p.vf*dt;
@@ -207,6 +213,32 @@ function drawFx(now){
 }
 requestAnimationFrame(drawFx);
 setLv(LV);
+/* ---- バックグラウンド再生 ----
+   画面が隠れたら、BGMの出口を <audio> 要素（MediaStream）に付け替える。
+   <audio> が鳴っているとiPhone/Androidは画面オフ・別アプリ中でも再生を続けやすい。
+   画面に戻ったら低遅延の通常経路に戻す。 */
+let bgEl=null,bgDest=null,bgOn=false;
+function setupBg(){
+  if(bgEl||!ctx||!comp)return;
+  try{
+    bgDest=ctx.createMediaStreamDestination();
+    bgEl=new Audio();bgEl.srcObject=bgDest.stream;bgEl.setAttribute('playsinline','');
+    if('mediaSession' in navigator){
+      navigator.mediaSession.metadata=new MediaMetadata({title:'ダンス霊幻',artist:'霊幻新隆'});
+      navigator.mediaSession.setActionHandler('play',()=>{if(!playing)$('start').click()});
+      navigator.mediaSession.setActionHandler('pause',()=>{if(playing)$('start').click()});
+    }
+  }catch(_){bgEl=null}
+}
+function bgRoute(hidden){
+  if(!bgEl||!playing)return;
+  try{
+    if(hidden&&!bgOn){comp.disconnect(ctx.destination);comp.connect(bgDest);bgOn=true;LOOK=1.5;bgEl.play().catch(()=>{})}
+    else if(!hidden&&bgOn){comp.disconnect(bgDest);comp.connect(ctx.destination);bgOn=false;LOOK=.12}
+  }catch(_){}
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)bgRoute(true);else{bgRoute(false);if(ctx&&ctx.state!=='running')ctx.resume()}});
+addEventListener('pagehide',()=>bgRoute(true));
 var RB=[];
 (function(){const im=new Image();im.onload=()=>{
   const c=document.createElement('canvas');c.width=im.width;c.height=im.height;const x=c.getContext('2d');
@@ -228,12 +260,12 @@ var rbF=0;setInterval(()=>{if(RB.length&&LV>0&&rb.style.opacity==='1'){rbF=(rbF+
 requestAnimationFrame(tick);
 
 /* ---- 音の部品 ---- */
-let master,pad,rev,noiseBuf,next16=0,step=0,timer=null;
+let master,pad,rev,noiseBuf,comp,next16=0,step=0,timer=null,LOOK=.12;
 const mtof=m=>440*Math.pow(2,(m-69)/12);
 function initAudio(){
   if(ctx){if(ctx.state!=='running')ctx.resume();return}
   ctx=new AudioContext({latencyHint:'interactive'});
-  const comp=ctx.createDynamicsCompressor();comp.threshold.value=-10;comp.ratio.value=6;
+  comp=ctx.createDynamicsCompressor();comp.threshold.value=-10;comp.ratio.value=6;
   master=ctx.createGain();master.gain.value=.8;master.connect(comp).connect(ctx.destination);
   pad=ctx.createGain();pad.connect(master);                 // EDMのポンプ用
   noiseBuf=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);
@@ -247,7 +279,7 @@ function initAudio(){
 let playing=false;
 function schedule(){if(!playing)return;
   const s16=60/bpm/4;
-  while(next16<ctx.currentTime+.12){STYLES[style].play(step,next16,s16);next16+=s16;step++}
+  while(next16<ctx.currentTime+LOOK){STYLES[style].play(step,next16,s16);next16+=s16;step++}
 }
 function env(g,t,a,peak,d){g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+d)}
 function osc(type,f,t,d,vol,dest,{a=.005,detune=0,lp=0}={}){
@@ -449,7 +481,7 @@ addEventListener('pointerdown',ensure,{capture:true});
 document.addEventListener('visibilitychange',()=>{if(ctx&&!document.hidden)ctx.resume()});
 $('start').onclick=()=>{
   ensure();playing=!playing;
-  if(playing){next16=ctx.currentTime+.1;audioStart=next16;step=0;lastBeat=-1;$('start').textContent='■ BGM'}
+  if(playing){setupBg();if(bgEl)bgEl.play().then(()=>bgEl.pause()).catch(()=>{});next16=ctx.currentTime+.1;audioStart=next16;step=0;lastBeat=-1;$('start').textContent='■ BGM'}
   else $('start').textContent='▶ BGM';
 };
 // ペンライト／クラッカー／タンバリン／拍手 はどれか1つだけ選べる（タップの使い道が重なるため）
